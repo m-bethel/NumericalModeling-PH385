@@ -10,62 +10,43 @@ Author: Miles Bethel (miles.d.bethel@gmail.com)
 Date: 1/26/2026
 */
 
+#include <cmath>
 #include <iostream>
 #include "system.h"
 #include "object.h"
 
 using namespace std;
 
-int main()
-{
-    double mass;
-    double mass_Sun;
-    double mass_Jupiter;
-    double mass_earth;
-    string name;
-    string sun = "Sun";
-    string jupiter = "Jupiter";
-    string earth = "Earth";
-    double position;
-    double x,y,z;
-    double velocity;
-    double vx,vy,vz;
+int main() {
+    // Simulation config
+    double simulationTime = 11.2;        // Simulation duration in Earth years (roughly 1 Jupiter orbit)
+    const double DAY = 1.0 / 365.25;     // One day represented as a fraction of a year
+    double timeStep = 1 * DAY;           // 1-day increments for the solver
 
+    // Experimental mass multipliers to test system stability
+    double jupiterMassMult = 1000; 
+    double earthMassMult = 1;
+    double sunMassMult = 1;
 
-    cout << "=== Three Body Simulation of Earth, Jupiter, and the Sun ===" << endl;
+    cout << "=== Solar System Simulation: Sun, Earth, Jupiter ===" << endl;
 
-    // ===== Create Pendulum object =====
-    // Constructor initializes the pendulum with the specified parameters
-    Object sun("Sun", 1, Vector3D(0,0,0), Vector3D(0,0,0));
+    System solarSystem;
+
+    // SUN: Mass=1 (Solar Mass), Position=(0,0,0), Velocity=(0,0,0)
+    Object sun("Sun", 1.0 * sunMassMult, Vector3D(0,0,0), Vector3D(0,0,0));
     solarSystem.addObject(sun);
 
-    Object earth("Earth", 3.0027e-6, Vector3D(1,0,0), Vector3D(0,2*M_PI,0));
+    // EARTH: Mass~3e-6, 1 AU from Sun, Velocity=2*pi (1 orbit per year)
+    Object earth("Earth", 3.0027e-6 * earthMassMult, Vector3D(1,0,0), Vector3D(0, 2*M_PI, 0));
     solarSystem.addObject(earth);
 
-    // Simulation parameters
-    double timeStep = 1 * DAY;          // 1 day time steps
-    double simulationTime = 365 * DAY;  // Simulate 1 year
-    
-    std::cout << "Starting Earth orbit simulation...\n";
-    std::cout << "Time step: " << timeStep/DAY << " days\n";
-    std::cout << "Duration: " << simulationTime/DAY << " days (1 year)\n\n";
-    
-    // Run simulation
+    // JUPITER: Mass~1e-3, ~5.2 AU from Sun, lower orbital velocity
+    Object jupiter("Jupiter", 0.000954 * jupiterMassMult, Vector3D(-5.2, 0, 0), Vector3D(0, -0.876897*M_PI, 0));
+    solarSystem.addObject(jupiter);
+
+    cout << "Starting simulation for " << simulationTime << " years..." << endl;
     solarSystem.simulate(simulationTime, timeStep, "orbit_data.csv");
-    
-    std::cout << "\nYou can plot the orbit using Python:\n";
-    std::cout << "import pandas as pd\n";
-    std::cout << "import matplotlib.pyplot as plt\n";
-    std::cout << "data = pd.read_csv('orbit_data.csv')\n";
-    std::cout << "earth = data[data['object'] == 'Earth']\n";
-    std::cout << "plt.plot(earth['x'], earth['y'])\n";
-    std::cout << "plt.xlabel('x (AU)')\n";
-    std::cout << "plt.ylabel('y (AU)')\n";
-    std::cout << "plt.title('Earth Orbit')\n";
-    std::cout << "plt.axis('equal')\n";
-    std::cout << "plt.grid(True)\n";
-    std::cout << "plt.show()\n";
-    
-    return 0;
+    cout << "Done. Results saved to orbit_data.csv" << endl;
+
     return 0;
 }

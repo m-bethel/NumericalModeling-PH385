@@ -24,44 +24,66 @@ int main()
     // Simulation Parameters
     double dt = 0.001;
     double t = 0;
-    double tEnd = 100;
+    double tEnd = 10;
+    double U_lid = 1.0;
+    int frameCount = 0;
+    int step = 0;
+
+    int max_Iterations = 2000;
+    double tol = 1E-6;
 
     // Fluid Properties
-    double rho = 1.27;
+    double rho = 1.0;
     double nu = 0.1;
 
     //MESH GRID PARAMETERS
-    int nx = 64;
-    int ny = 32;
-    int jmin = 2;
-    int imin = 2;
-    int imax = imin + nx -1;
-    int jmax = jmin + ny -1;
-    double Lx = 10.0;
+    int nx = 32;
+    int ny = 16;
+    double Lx = 1.0;
     double Ly = 1.0;
-    double dx, dy, dxi, dyi;
-    //std::vector<double> x,y,xm,ym;
+
+    //Chec to make sure values are within spec
+    double dx = Lx / nx;
+    double cfl_conv = U_lid * dt / dx;
+    double cfl_diff = nu * dt / (dx * dx);
+    cout << "CFL convective: " << cfl_conv << endl;
+    cout << "CFL diffusive:  " << cfl_diff << endl;
+    if (cfl_conv > 0.5 || cfl_diff > 0.5)
+        cout << "WARNING: CFL condition violated!" << endl;
 
 
-    Mesh mesh2D(nx, ny, Lx, Ly, imin, imax, jmin, jmax,
-                 dx, dy, dxi, dyi);
+    Mesh mesh2D(nx, ny, Lx, Ly); 
     mesh2D.setUpMesh();
     
     Poisson solver(mesh2D);
 
-    Stokes stokes ();
+    Stokes stokes (mesh2D, nu);
 
     while (t < tEnd){
-        stokes.predict(dt);
 
-        solver.buildRHS(stokes.getUstart(), stokes.getVStart(), dt, rho, dxi, dyi);
+        stokes.applyBoundary(U_lid);
+    
+        stokes.predict(dt, mesh2D.getDxi(), mesh2D.getDyi());
+        
+        stokes.applyBoundaryToStar(U_lid);
 
-        solver.solve();
+        solver.buildRHS(stokes.getUStar(), stokes.getVStar() , dt, rho,
+                        mesh2D.getDxi(), mesh2D.getDyi());
 
-        stokes.correct(solver.getP(), dt, rho, dxi, dyi);
+        solver.solve(max_Iterations, tol);
+
+        stokes.correct(solver.getP(), dt, rho, mesh2D.getDxi(), mesh2D.getDyi());
+        
+        stokes.applyBoundary(U_lid);
+
+        if (step % 100 == 0){
+            string filename = "frame_" + to_string(frameCount) + ".csv";
+            stokes.exportFrame(filename, frameCount, solver.getP());
+            frameCount++;
+        }
 
         t += dt;
-
+        step++;
     }
 
 

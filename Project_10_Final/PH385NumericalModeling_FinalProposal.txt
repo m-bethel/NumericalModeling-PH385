@@ -1,0 +1,24 @@
+﻿PH 385 Project Proposal: Navier-Stok
+es Simulation of Von Kármán Vortex Shedding
+1. Statement of Objective
+The objective of this project is to simulate and analyze the transient flow of an incompressible fluid around a cylindrical bluff body using the OpenFOAM C++ framework. The simulation will specifically target the phenomenon of Von Kármán Vortex Shedding to calculate the Strouhal number (St) and analyze the periodic lift and drag forces acting on the cylinder.
+2. Motivation
+The Von Kármán Vortex Street is a fundamental concept in fluid-structure interaction, explaining why bridges oscillate and power lines "hum" in the wind. Using OpenFOAM allows for the study of high-Reynolds number flows that are analytically intractable, providing experience with the industry-standard software used for aerospace and civil engineering. This is a great opportunity to include this on a resume as a project or post on LinkedIn/ add to my github repo to showcase skills for future employers
+3. Overview of Physical Principles
+The simulation is governed by the incompressible Navier-Stokes equations:
+Momentum: ∂t∂u​+(u⋅∇)u=−ρ1​∇p+ν∇2u
+Continuity: ∇⋅u=0
+Dimensionless Parameters: The flow behavior is determined by the Reynolds Number (Re=νUD​). Vortex shedding will be triggered by targeting a Re range between 100 and 1000.
+Shedding Frequency: The periodic nature of the wake is characterized by the Strouhal Number: St=UfD​, where f is the shedding frequency and D is the cylinder diameter.
+4. Overview of Numerical Methods
+OpenFOAM’s Finite Volume Method (FVM) will be utilized with the following configuration:
+Solver: pisoFoam, a pressure-implicit with splitting of operators (PISO) algorithm designed for transient, incompressible flow.
+Meshing: A 2D structured mesh generated via blockMesh, with local refinement (grading) near the cylinder surface to resolve the boundary layer and wake.
+Temporal Discretization: Second-order backward Euler or Crank-Nicolson schemes to ensure temporal accuracy of the oscillating wake.
+Boundary Conditions: Uniform velocity inlet, zero-gradient pressure outlet, and no-slip walls on the cylinder.
+5. Development/Validation Roadmap
+Phase 1 (Mesh Generation): Construct a computational domain where the cylinder is placed sufficiently far from boundaries to avoid artificial interference.
+Phase 2 (Steady-State Initialization): Run a short simpleFoam simulation to establish an initial flow field.
+Phase 3 (Transient Execution): Execute pisoFoam with a Courant number (Co<1) to capture the onset of instability and the subsequent periodic vortex shedding.
+Phase 4 (Validation): Extract the lift coefficient (CL​) time-history. Perform a Fast Fourier Transform (FFT) on the CL​ data to find the dominant frequency (f) and verify that the resulting St matches experimental values for the chosen Re.
+Phase 5 (Visualization): Use ParaView to generate contour plots of Vorticity and Q-criterion to visually demonstrate the alternating vortex pairs.

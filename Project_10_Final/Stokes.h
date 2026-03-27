@@ -10,6 +10,7 @@ Date: 03/20/2026
 #define STOKES_H
 
 #include <vector>
+#include <string>
 #include "Mesh.h"
 
 class Stokes {
@@ -28,6 +29,12 @@ public:
     
     // The Corrector Step (Section 7)
     void correct(const std::vector<double>& p, double dt, double rho, double dxi, double dyi);
+
+    // Boundary Conditions
+    void applyBoundary(double U_lid);
+    void applyBoundaryToStar(double U_lid);
+
+    void exportFrame(std::string filename, int frame, const std::vector<double>& p);
 
     // Getters for the Poisson RHS
     const std::vector<double>& getUStar() const { return m_uStar; }
