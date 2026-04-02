@@ -1,0 +1,3 @@
+#!/bin/bash
+g++ main.cpp program.cpp -o potential_sim -O3
+./potential_sim

@@ -1,0 +1,6 @@
+#!/bin/bash
+
+g++ -O3  main.cpp Lattice.cpp -o ising_model
+echo "Starting the Simulation"
+time ./ising_model
+python3 Ising_Plot.py
