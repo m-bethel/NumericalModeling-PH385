@@ -9,28 +9,31 @@ Date: 03/20/2026
 #ifndef MESH_H
 #define MESH_H
 
-#include <string>
-#include <vector>
+class Mesh {
+private:
+    int m_nx, m_ny;
+    float m_Lx, m_Ly;
+    float m_dx, m_dy;   // Physical spacing
+    float m_dxi, m_dyi; // Inverse spacing
 
-class Mesh
-{
-    private:
-        int m_nx, m_ny;
-        double m_Lx, m_Ly;
-        double m_dx, m_dy, m_dxi, m_dyi;
-        std::vector<double> m_x, m_y;
+public:
+    Mesh(int nx, int ny, float Lx, float Ly);
+    
+    // Grid dimensions
+    int getNx() const { return m_nx; }
+    int getNy() const { return m_ny; }
 
-    public:
+    // Domain sizes
+    float getLx() const { return m_Lx; }
+    float getLy() const { return m_Ly; }
 
-        Mesh(int nx, int ny, double Lx, double Ly);
-        void setUpMesh();
-        
-        int getNx() const { return m_nx; }
-        int getNy() const { return m_ny; }
-        double getDxi() const { return m_dxi; }
-        double getDyi() const { return m_dyi; }
-        double getX(int i) const { return m_x[i]; }
-        double getY(int j) const { return m_y[j]; }
+    // Physical spacing (Used for placing the cylinder)
+    float getDx() const { return m_dx; }
+    float getDy() const { return m_dy; }
+
+    // Inverse spacing (Used for fast math in Poisson/Stokes)
+    float getDxi() const { return m_dxi; }
+    float getDyi() const { return m_dyi; }
 };
 
 #endif //MESH_H

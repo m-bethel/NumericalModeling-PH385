@@ -1,0 +1,14 @@
+# Exclude all binary simulation data
+*.bin
+
+# Exclude the compiled executable (if it's named 'sim')
+sim
+*.exe
+*.out
+
+# Exclude OS-specific junk
+.DS_Store
+Thumbs.db
+
+# Exclude build directories 
+build/

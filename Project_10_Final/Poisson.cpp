@@ -8,134 +8,132 @@ Date: 03/20/2026
 
 
 #include "Poisson.h"
-#include <iostream>
 
-using namespace std;
-
-Poisson::Poisson(const Mesh& mesh){
-
-    m_dxi2 = mesh.getDxi() * mesh.getDxi();
-    m_dyi2 = mesh.getDyi() * mesh.getDyi();
+Poisson::Poisson(const Mesh& mesh) {
     m_nx = mesh.getNx();
     m_ny = mesh.getNy();
-    m_size = m_nx*m_ny;
+    m_dx = mesh.getDx();
+    m_dy = mesh.getDy();
 
-    m_p.assign(m_size, 0.0);
-    m_RHS.assign(m_size, 0.0);
-    m_diag.resize(m_size);
+    m_p.assign(m_nx * m_ny, 0.0);
+    m_RHS.assign(m_nx * m_ny, 0.0);
+    m_isSolid.assign(m_nx * m_ny, false);
 
-    m_rowPtr.push_back(0); // First row starts at index 0
+    // Pre-calculate Cylinder Mask once
+    float cx = 0.3, cy = 0.49, R2 = 0.1 * 0.1;
 
     for (int j = 0; j < m_ny; ++j) {
         for (int i = 0; i < m_nx; ++i) {
+            float x = i * m_dx;
+            float y = j * m_dy;
+            if (((x - cx) * (x - cx) + (y - cy) * (y - cy)) <= R2) {
+                m_isSolid[i + j * m_nx] = true;
+            }
+        }
+    }
+}
+
+void Poisson::solve(int max_Iterations, float tol, float dxi, float dyi) {
+    float dxi2 = dxi * dxi;
+    float dyi2 = dyi * dyi;
+    float beta = 2.0 * (dxi2 + dyi2);
+    float omega = 1.8; // Successive Over-Relaxation factor
+    float localMaxError; 
+
+    #pragma omp parallel
+    {
+        for (int iter = 0; iter < max_Iterations; ++iter) {
+            #pragma omp single
+            {
+                localMaxError = 0.0;
+            }
+
+            // PASS 1: RED CELLS (i+j is even)
+            #pragma omp for reduction(max:localMaxError)
+            for (int j = 1; j < m_ny - 1; ++j) {
+                for (int i = 1; i < m_nx - 1; ++i) {
+                    if ((i + j) % 2 == 0) {
+                        int k = i + j * m_nx;
+                        if (m_isSolid[k]) {
+                            m_p[k] = 0.0; 
+                        } else {
+                            float p_old = m_p[k];
+                            float neighbors = dxi2 * (m_p[k+1] + m_p[k-1]) + 
+                                               dyi2 * (m_p[k+m_nx] + m_p[k-m_nx]);
+                            float p_gs = (neighbors - m_RHS[k]) / beta;
+                            m_p[k] = (1.0 - omega) * p_old + omega * p_gs;
+                            localMaxError = std::max(localMaxError, std::abs(m_p[k] - p_old));
+                        }
+                    }
+                }
+            }
+
+            // PASS 2: BLACK CELLS (i+j is odd)
+            #pragma omp for reduction(max:localMaxError)
+            for (int j = 1; j < m_ny - 1; ++j) {
+                for (int i = 1; i < m_nx - 1; ++i) {
+                    if ((i + j) % 2 != 0) {
+                        int k = i + j * m_nx;
+                        if (m_isSolid[k]) {
+                            m_p[k] = 0.0;
+                        } else {
+                            float p_old = m_p[k];
+                            float neighbors = dxi2 * (m_p[k+1] + m_p[k-1]) + 
+                                               dyi2 * (m_p[k+m_nx] + m_p[k-m_nx]);
+                            float p_gs = (neighbors - m_RHS[k]) / beta;
+                            m_p[k] = (1.0 - omega) * p_old + omega * p_gs;
+                            localMaxError = std::max(localMaxError, std::abs(m_p[k] - p_old));
+                        }
+                    }
+                }
+            }
+
+            // Apply Boundary Conditions & Check Convergence
+            static bool shouldBreak;
+            #pragma omp single
+            {
+                // Neumann BCs: dp/dn = 0 (Pressure at wall = Pressure just inside wall)
+                for (int i = 0; i < m_nx; ++i) {
+                    m_p[i + 0 * m_nx] = m_p[i + 1 * m_nx];               // Bottom
+                    m_p[i + (m_ny-1) * m_nx] = m_p[i + (m_ny-2) * m_nx]; // Top
+                }
+                for (int j = 0; j < m_ny; ++j) {
+                    m_p[0 + j * m_nx] = m_p[1 + j * m_nx];               // Inlet
+                    m_p[(m_nx-1) + j * m_nx] = 0.0;                      // Outlet Fixed
+                }
+            }
+            
+            // Check if we should stop early
+            if (localMaxError < tol) break;
+            #pragma omp barrier 
+            if (shouldBreak) break;
+        }
+    }
+}
+
+void Poisson::buildRHS(const std::vector<float>& uStar, 
+                       const std::vector<float>& vStar, 
+                       float dt, float rho, float dxi, float dyi) 
+{
+    // Reset RHS to zero
+    std::fill(m_RHS.begin(), m_RHS.end(), 0.0);
+
+    for (int j = 1; j < m_ny - 1; ++j) {
+        for (int i = 1; i < m_nx - 1; ++i) {
             int k = i + j * m_nx;
 
-            double dxi2 = m_dxi2;
-            double dyi2 = m_dyi2;
-            // Calculating the center coefficents with Neumann Adjusments
-            double center = 2.0 * (dxi2 + dyi2);
-            if (j == 0) center -= dyi2;        // Bottom Wall
-            if (j == m_ny - 1) center -= dyi2; // Top Wall
-            if (i == 0) center -= dxi2;        // Left Wall
-            if (i == m_nx - 1) center -= dxi2; // Right Wall
-            
-            // Adding neighbors in increasing column order (this is important)
+            // Correct 1D indices for neighbors
+            int k_right = (i + 1) + j * m_nx;
+            int k_left  = (i - 1) + j * m_nx;
+            int k_up    = i + (j + 1) * m_nx;
+            int k_down  = i + (j - 1) * m_nx;
 
-            // 1. Bottom neighbor (j-1)
-            if (j > 0) {
-                m_values.push_back(-dyi2);
-                m_colIndices.push_back(k - m_nx);
-            }
-            
-            // 2. Left neighbor (i-1)
-            if (i > 0) {
-                m_values.push_back(-dxi2);
-                m_colIndices.push_back(k - 1);
-            }
+            // Central difference calculation for divergence
+            float du_dx = (uStar[k_right] - uStar[k_left]) * 0.5 * dxi;
+            float dv_dy = (vStar[k_up] - vStar[k_down]) * 0.5 * dyi;
 
-            // 3. Center Node
-            m_values.push_back(center);
-            m_colIndices.push_back(k);
-            m_diag[k] = center;
-
-            // 4. Right neighbor (i+1)
-            if (i < m_nx - 1) {
-                m_values.push_back(-dxi2);
-                m_colIndices.push_back(k + 1);
-            }
-
-            // 5. Top neighbor (j+1)
-            if (j < m_ny - 1) {
-                m_values.push_back(-dyi2);
-                m_colIndices.push_back(k + m_nx);
-            }
-
-            // Mark where the next row starts
-            m_rowPtr.push_back(m_values.size());
-        }
-    }
-    m_values[m_rowPtr[0]] = 1.0;
-}
-
-void Poisson::solve(int max_Iterations, double tol){
-
-    double dxi2 = m_dxi2;
-    double dyi2 = m_dyi2;
-    double beta = 2.0 * (dxi2 + dyi2);
-
-    for (int iter = 0; iter < max_Iterations; ++iter) {
-        double maxError = 0.0;
-    
-
-        // Loop through internal cells (Subtraction Method safe zone)
-        for (int j = 1; j < m_ny - 1; ++j) {
-            for (int i = 1; i < m_nx - 1; ++i) {
-                int k = i + j * m_nx;
-                
-                double oldP = m_p[k];
-                
-                // Gauss-Seidel Formula
-                double neighbors = dxi2 * (m_p[k+1] + m_p[k-1]) + 
-                                   dyi2 * (m_p[k+m_nx] + m_p[k-m_nx]);
-                
-                m_p[k] = (neighbors - m_RHS[k]) / beta;
-
-                maxError = std::max(maxError, std::abs(m_p[k] - oldP));
-            }
-        }
-        // Including a copy for the boundaries
-        for (int i = 0; i < m_nx; ++i) {
-            m_p[i + 0 * m_nx] = m_p[i + 1 * m_nx];                   // Bottom
-            m_p[i + (m_ny-1) * m_nx] = m_p[i + (m_ny-2) * m_nx];     // Top
-        }
-        for (int j = 0; j < m_ny; ++j) {
-            m_p[0 + j * m_nx] = m_p[1 + j * m_nx];                   // Left
-            m_p[(m_nx-1) + j * m_nx] = m_p[(m_nx-2) + j * m_nx];     // Right
-        }
-
-        //m_p[0] = 0.0;
-
-        // Check for convergence
-        if (maxError < tol) break;
-    }
-}
-
-void Poisson::buildRHS(const std::vector<double>& uStar, 
-                       const std::vector<double>& vStar, 
-                       double dt, double rho, double dxi, double dyi) 
-{
-    fill(m_RHS.begin(), m_RHS.end(), 0.0);
-    int n = 0;
-    for (int j = 1; j < m_ny-1; ++j) {
-        for (int i = 1; i < m_nx-1; ++i) {
-            //int k = i + j * m_nx;
-            n += 1;
-            double du_dx = (uStar[i+1, j] - uStar[i,j]) * dxi;
-            double dv_dy = (vStar[i, j+1] - vStar[i, j]) * dyi;
-
-            m_RHS[n] = -(rho / dt) * (du_dx + dv_dy);
-
-
+            // Notice: Positve sign here balances the subtraction in the solver!
+            m_RHS[k] = (rho / dt) * (du_dx + dv_dy);
         }
     }
 }

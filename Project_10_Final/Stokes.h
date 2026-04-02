@@ -15,30 +15,29 @@ Date: 03/20/2026
 
 class Stokes {
 private:
-    std::vector<double> m_u, m_v;       // Current velocities (n)
-    std::vector<double> m_uStar, m_vStar; // Intermediate velocities (*)
-    double m_nu; // Viscosity
+    std::vector<float> m_u, m_v;       // Current velocities (n)
+    std::vector<float> m_uStar, m_vStar; // Intermediate velocities (*)
+    float m_nu; // Viscosity
     int m_nx, m_ny;
 
-
 public:
-    Stokes(const Mesh& mesh, double nu);
+    Stokes(const Mesh& mesh, float nu);
     
     // The Predictor Step (Sections 4 & 5)
-    void predict(double dt, double dxi, double dyi);
+    void predict(float dt, float dxi, float dyi);
     
     // The Corrector Step (Section 7)
-    void correct(const std::vector<double>& p, double dt, double rho, double dxi, double dyi);
+    void correct(const std::vector<float>& p, float dt, float rho, float dxi, float dyi);
 
     // Boundary Conditions
-    void applyBoundary(double U_lid);
-    void applyBoundaryToStar(double U_lid);
+    void applyBoundary(float U_in);
+    void applyBoundaryToStar(float U_in);
 
-    void exportFrame(std::string filename, int frame, const std::vector<double>& p);
+    void exportFrame(std::string filename, int frame, const std::vector<float>& p);
 
     // Getters for the Poisson RHS
-    const std::vector<double>& getUStar() const { return m_uStar; }
-    const std::vector<double>& getVStar() const { return m_vStar; }
+    const std::vector<float>& getUStar() const { return m_uStar; }
+    const std::vector<float>& getVStar() const { return m_vStar; }
 };
 
 #endif
