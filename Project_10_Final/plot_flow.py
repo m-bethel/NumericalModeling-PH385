@@ -12,7 +12,7 @@ Lx, Ly = 4.0, 1.0                       # Physical dimensions of the domain
 
 # --- RENDERING MODE ---
 # Set to "speed" for Velocity Magnitude or "pressure" for Pressure
-MODE = "speed" 
+MODE = "pressure" 
 
 # Locate all simulation output files
 files = sorted(glob.glob("frame_*.bin"), key=lambda x: int(x.split('_')[1].split('.')[0]))

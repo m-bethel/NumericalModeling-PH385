@@ -26,7 +26,7 @@ fig, ax = plt.subplots(figsize=(16, 4))
 
 # Use 'magma' or 'inferno' for Speed (dark to bright)
 # Use 'jet' or 'RdBu_r' for Pressure
-cmap_choice = 'magma' if MODE == "speed" else 'jet'
+cmap_choice = 'magma' if MODE == "speed" else 'terrain'
 
 im = ax.imshow(np.zeros((ny, nx)), origin='lower', extent=[0, Lx, 0, Ly], 
                cmap=cmap_choice, animated=True, aspect='equal')
